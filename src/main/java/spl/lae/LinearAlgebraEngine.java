@@ -4,7 +4,7 @@ import parser.*;
 import memory.*;
 import scheduling.*;
 
-import java.util.ArrayList;
+import java.util.ArrayList; //imported for code structure
 import java.util.List;
 
 public class LinearAlgebraEngine {
@@ -21,7 +21,7 @@ public class LinearAlgebraEngine {
     public ComputationNode run(ComputationNode computationRoot) {
         // TODO: resolve computation tree step by step until final matrix is produced
         try{
-            while (computationRoot.getNodeType() != ComputationNodeType.MATRIX) {
+            while(computationRoot.getNodeType() != ComputationNodeType.MATRIX){
                 ComputationNode compNode = computationRoot.findResolvable(); 
                 compNode.associativeNesting();
                 compNode = compNode.findResolvable();
@@ -31,7 +31,8 @@ public class LinearAlgebraEngine {
         }
         finally{
             try{
-               executor.shutdown();  
+                System.out.println(getWorkerReport());
+                executor.shutdown();
             }
             catch(InterruptedException e){
                 Thread.currentThread().interrupt();
@@ -43,7 +44,7 @@ public class LinearAlgebraEngine {
     public void loadAndCompute(ComputationNode node) {
         // TODO: load operand matrices
         // TODO: create compute tasks & submit tasks to executor
-         ComputationNodeType nodeType = node.getNodeType();
+        ComputationNodeType nodeType = node.getNodeType();
         List<ComputationNode> listNode = node.getChildren();
         List<Runnable> toSubmit = new ArrayList<>();
         if(nodeType.equals(ComputationNodeType.ADD)){
@@ -69,54 +70,56 @@ public class LinearAlgebraEngine {
 
     public List<Runnable> createAddTasks() {
         // TODO: return tasks that perform row-wise addition
-        List<Runnable> addTasks = new ArrayList<>();
-        if (leftMatrix.length() != rightMatrix.length()) {
-            throw new IllegalArgumentException("[Add]: Matrices lengths do not match");
-        }
-        for(int i = 0; i<leftMatrix.length(); i++){
+        List<Runnable> addOutput = new ArrayList<>();
+        // if(leftMatrix.length() != rightMatrix.length()){
+        //     throw new IllegalArgumentException("[createAddTasks]: Matrix lengths don't match");
+        // }
+        for(int i = 0; i < leftMatrix.length(); i++){
             SharedVector left = leftMatrix.get(i);
-            SharedVector right = rightMatrix.get(i);    
-            Runnable addTask = () -> {left.add(right);};
-            addTasks.add(addTask);
+            SharedVector right = rightMatrix.get(i);
+            Runnable addRun = () -> {left.add(right);};
+            addOutput.add(addRun);
         }
-        return addTasks;
+        return addOutput;
     }
-
+ 
     public List<Runnable> createMultiplyTasks() {
         // TODO: return tasks that perform row × matrix multiplication
-        List<Runnable> multiplyTasks = new ArrayList<>();
-        for(int i = 0; i<leftMatrix.length(); i++){
-            SharedVector left = leftMatrix.get(i);  
-            Runnable multiplyTask = () -> {left.vecMatMul(rightMatrix);};
-            multiplyTasks.add(multiplyTask);
+        List<Runnable> mulOutput = new ArrayList<>();
+        for(int i = 0; i < leftMatrix.length(); i++){
+            SharedVector left = leftMatrix.get(i);
+            Runnable mulRun = () -> {left.vecMatMul(rightMatrix);};
+            mulOutput.add(mulRun);
         }
-        return multiplyTasks;
+        return mulOutput;
     }
 
     public List<Runnable> createNegateTasks() {
         // TODO: return tasks that negate rows
-        List<Runnable> negateTasks = new ArrayList<>();
-        for(int i = 0; i<leftMatrix.length(); i++){
-            SharedVector left = leftMatrix.get(i);  
-            Runnable negateTask = () -> {left.negate();};
-            negateTasks.add(negateTask);
+        List<Runnable> negateOutput = new ArrayList<>();
+        for(int i = 0; i < leftMatrix.length(); i++){
+            SharedVector negateVector = leftMatrix.get(i);
+            Runnable negRun = () -> {negateVector.negate();};
+            negateOutput.add(negRun);
         }
-        return negateTasks;
+        return negateOutput;
     }
 
     public List<Runnable> createTransposeTasks() {
         // TODO: return tasks that transpose rows
-        List<Runnable> transposeTasks = new ArrayList<>();
-        for(int i = 0; i<leftMatrix.length(); i++){
-            SharedVector left = leftMatrix.get(i);  
-            Runnable transposeTask = () -> {left.transpose();};
-            transposeTasks.add(transposeTask);
+        List<Runnable> transOutput = new ArrayList<>();
+        for(int i = 0; i < leftMatrix.length(); i++){
+            SharedVector transVector = leftMatrix.get(i);
+            Runnable transRun = () -> {transVector.transpose();};
+            transOutput.add(transRun);
         }
-        return transposeTasks;
+        return transOutput;
     }
 
     public String getWorkerReport() {
         // TODO: return summary of worker activity
         return executor.getWorkerReport();
     }
+
+
 }

@@ -5,7 +5,7 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
-public class TiredThread extends Thread implements Comparable<TiredThread> {
+public class TiredThread extends Thread implements Comparable<TiredThread> {      //test
 
     private static final Runnable POISON_PILL = () -> {}; // Special task to signal shutdown
 
@@ -24,6 +24,9 @@ public class TiredThread extends Thread implements Comparable<TiredThread> {
     private final AtomicLong idleStartTime = new AtomicLong(0); // Timestamp when the worker became idle
 
     public TiredThread(int id, double fatigueFactor) {
+        if(fatigueFactor < 0.5 || fatigueFactor >= 1.5){
+            throw new IllegalArgumentException("[TiredThread]: fatigue factor must be 0.5 <=x< 1.5");
+        }
         this.id = id;
         this.fatigueFactor = fatigueFactor;
         this.idleStartTime.set(System.nanoTime());
@@ -56,60 +59,66 @@ public class TiredThread extends Thread implements Comparable<TiredThread> {
      * it throws IllegalStateException.
      */
     public void newTask(Runnable task) {
-       if (busy.get()) {
-        throw new IllegalStateException("[newTask]: Thread is busy! cannot get new task!");    
-       }
-       if(!alive.get()){
+        if(isBusy() || !handoff.isEmpty()){
+            throw new IllegalStateException("[newTask]: Thread is busy! cannot get new task!");
+        }
+        if(!alive.get()){
             throw new IllegalStateException("[newTask]: Thread is DEAD! cannot get new task!");
         }
-        busy.set(true);
+        busy.set(true); //Once handed a task, set busy to true
         handoff.offer(task);
     }
+ 
 
     /**
      * Request this worker to stop after finishing current task.
      * Inserts a poison pill so the worker wakes up and exits.
      */
     public void shutdown() {
-       handoff.offer(POISON_PILL);
+        try{
+            handoff.put(POISON_PILL);
+        }
+        catch(InterruptedException e){
+            Thread.currentThread().interrupt();
+        }
     }
 
     @Override
     public void run() {
-       // TODO
-       while (alive.get()) {
-        try{
-            Runnable task = handoff.take();
-            busy.set(true);
-            if (task == POISON_PILL) {
-              alive.set(false);
-              break;
+       while(alive.get()){
+            try{
+                Runnable curtask=handoff.take();
+                busy.set(true);
+                if(curtask==POISON_PILL){ //Shut down signal
+                    alive.set(false); 
+                    break;
+                }
+                timeIdle.addAndGet(System.nanoTime()-idleStartTime.get());
+                curtask.run(); //set busy false and put into queue happens here
+                
             }
-            long startTime = (System.nanoTime());
-            timeIdle.addAndGet(System.nanoTime() - idleStartTime.get());
-            task.run();
-            long endTime = (System.nanoTime());
-            long duration = endTime - startTime;
-            timeUsed.addAndGet(duration);
-            idleStartTime.set(System.nanoTime());
-        }
-        catch(InterruptedException e){
-            Thread.currentThread().interrupt();
+            catch(InterruptedException e){
+                Thread.currentThread().interrupt(); //Shouldn't happen in our project.
+            }
        }
-       finally{
-            busy.set(false);
-            synchronized(TiredExecutor.class){
-                TiredExecutor.class.notifyAll();
-        }
-       }
-      }
     }
 
     @Override
     public int compareTo(TiredThread o) {
-        double result = this.getFatigue() - o.getFatigue();
-        if (result<0)  return -1;
-        else if (result>0)  return 1;
-        else  return 0;  
+        double res= getFatigue()-o.getFatigue();
+        if(res < 0) return -1;
+        else if(res > 0) return 1;
+        else return 0;
+    }
+
+    public void setBusy(boolean val){ // allows wrapped task in
+                                    // TiredExecutor to adjust busy value
+        busy.set(val);
+    }
+    public void setTimes(long curStartTime){ //updates System time for thread
+        long curStopTime=(System.nanoTime());
+        long TaskDuration=curStopTime-curStartTime;
+        timeUsed.addAndGet(TaskDuration);
+        idleStartTime.set(System.nanoTime());
     }
 }

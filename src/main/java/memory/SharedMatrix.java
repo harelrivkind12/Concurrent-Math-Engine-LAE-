@@ -5,72 +5,83 @@ public class SharedMatrix {
     private volatile SharedVector[] vectors = {}; // underlying vectors
 
     public SharedMatrix() {
-        // TODO: initialize empty matrix
         vectors = new SharedVector[0];
     }
 
     public SharedMatrix(double[][] matrix) {
-        // TODO: construct matrix as row-major SharedVectors
-         vectors=new SharedVector[matrix.length];
-        for(int i=0;i<matrix.length;i++){
+        if(matrix == null){
+            throw new IllegalArgumentException("[SharedMatrix]: Matrix cannot be null");
+        }
+        vectors=new SharedVector[matrix.length];
+        for(int i=0; i < matrix.length; i++){
             vectors[i]=new SharedVector(matrix[i],VectorOrientation.ROW_MAJOR);
         }
     }
 
     public void loadRowMajor(double[][] matrix) {
-        // TODO: replace internal data with new row-major matrix
-         SharedVector[] copy=new SharedVector[matrix.length];
-        for(int i=0;i<matrix.length;i++){
+        if(matrix == null){
+            throw new IllegalArgumentException("[SharedMatrix]: Matrix cannot be null");
+        }
+        SharedVector[] copy=new SharedVector[matrix.length];
+        for(int i=0; i < matrix.length; i++){
             copy[i]=new SharedVector(matrix[i],VectorOrientation.ROW_MAJOR);
         }
         vectors=copy;
     }
 
     public void loadColumnMajor(double[][] matrix) {
-        int other_columns=matrix[0].length;
-        SharedVector[] copy=new SharedVector[other_columns]; 
-        for (int c=0;c<other_columns;c++){
+        if(matrix == null){
+            throw new IllegalArgumentException("[SharedMatrix]: Matrix cannot be null");
+        }
+        if(matrix.length == 0){
+            throw new IllegalArgumentException("[SharedMatrix]: Matrix cannot be empty");
+        }
+        int otherCol=matrix[0].length;
+        SharedVector[] copy=new SharedVector[otherCol]; 
+        for (int c = 0; c < otherCol; c++){
             double[] normalVector=new double[matrix.length];
-            for(int r=0;r<matrix.length;r++){
+            for(int r = 0; r < matrix.length;r++){
                 normalVector[r]=matrix[r][c];
             }
-            copy[c]=new SharedVector(normalVector,VectorOrientation.COLUMN_MAJOR);
+            copy[c]=new SharedVector(normalVector, VectorOrientation.COLUMN_MAJOR);
         }  
         vectors=copy;
     }
 
     public double[][] readRowMajor() {
     // TODO: return matrix contents as a row-major double[][]
-    acquireAllVectorReadLocks(vectors);
-    try {
-        double[][] output;
-        if (this.length() == 0)
-            output = new double[0][0];
-        else {
-            if (vectors[0].getOrientation() == VectorOrientation.ROW_MAJOR) {
-                output = new double[this.length()][vectors[0].length()];
-                for (int i = 0; i < this.length(); i++) {
-                    for (int j = 0; j < vectors[0].length(); j++) {
-                        output[i][j] = vectors[i].get(j);
+        acquireAllVectorReadLocks(vectors);
+        try {
+            double[][] output;
+            if (this.length() == 0)
+                output = new double[0][0];
+            else {
+                if (vectors[0].getOrientation() == VectorOrientation.ROW_MAJOR){ //Case: Row Major
+                    output = new double[this.length()][vectors[0].length()];
+                    for (int i = 0; i < this.length(); i++) {
+                        for (int j = 0; j < vectors[0].length(); j++) {
+                            output[i][j] = vectors[i].get(j);
+                        }
                     }
-                }
-            } else { //Column major
-                output = new double[vectors[0].length()][length()];
-                for (int i = 0; i < vectors[0].length(); i++) {
-                    for (int j = 0; j < vectors.length; j++) {
-                        output[i][j] = vectors[j].get(i);
+                } 
+                else {    //Case: Column Major
+                    output = new double[vectors[0].length()][length()];
+                    for (int i = 0; i < vectors[0].length(); i++) {
+                        for (int j = 0; j < vectors.length; j++) {
+                            output[i][j] = vectors[j].get(i);
+                        }
                     }
                 }
             }
+            return output;
+        } 
+        finally {
+            releaseAllVectorReadLocks(vectors);
         }
-        return output;
-    } finally {
-        releaseAllVectorReadLocks(vectors);
     }
-}
 
     public SharedVector get(int index) {
-        if(index<0 || index>=vectors.length)
+        if(index < 0 || index >= vectors.length)
             throw new IndexOutOfBoundsException("[SharedVector get]: Index given is invalid");
         return vectors[index];
     }
@@ -85,7 +96,7 @@ public class SharedMatrix {
         // TODO: return orientation
         if(vectors.length==0)
             throw new IndexOutOfBoundsException("[getOrientation]: Given matrix is empty");
-       return vectors[0].getOrientation();
+        return vectors[0].getOrientation();
     }
 
     private void acquireAllVectorReadLocks(SharedVector[] vecs) {
@@ -111,7 +122,7 @@ public class SharedMatrix {
 
     private void releaseAllVectorWriteLocks(SharedVector[] vecs) {
         // TODO: release write lock for each vector
-        for(int i=0;i<vecs.length;i++){
+        for(int i = 0; i < vecs.length; i++){
             vecs[i].writeUnlock();
         }
     }
